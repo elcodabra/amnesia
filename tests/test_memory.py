@@ -300,3 +300,58 @@ def test_card_line_is_clipped_on_a_word_boundary() -> None:
     assert len(clipped) <= 40
     assert clipped.endswith("…")
     assert not clipped[:-1].endswith(" ")
+
+
+def test_day_detail_uses_local_dates_not_utc() -> None:
+    """A calendar is a human artefact.
+
+    A session at 01:00 local belongs to the night the person remembers, not to
+    whatever UTC calls it.
+    """
+    from datetime import timedelta
+
+    from amnesia.memory.analytics import day_detail
+
+    session = _session("late", start_min=0, length_min=30)
+    local_day = session.started_at.astimezone().date().isoformat()
+    detail = day_detail([session], local_day)
+    assert detail.sessions == 1
+    assert detail.entries[0]["opening"] == "do the thing"
+
+
+def test_day_detail_of_an_empty_day_is_empty_not_an_error() -> None:
+    from amnesia.memory.analytics import day_detail
+
+    detail = day_detail([_session("a")], "1999-01-01")
+    assert detail.sessions == 0 and detail.entries == [] and detail.active_hours == 0.0
+
+
+def test_hour_histogram_covers_every_hour() -> None:
+    """The chart draws 24 bars; a short list would silently drop the evening."""
+    from amnesia.memory.analytics import hour_histogram
+
+    hours = hour_histogram([_session("a"), _session("b", start_min=5)])
+    assert len(hours) == 24
+    assert sum(hours) == 2
+
+
+def test_project_hours_union_within_each_project() -> None:
+    """Two overlapping sessions on one project are not two hours of work."""
+    from amnesia.memory.analytics import project_hours
+
+    totals = dict(
+        project_hours(
+            [
+                _session("a", start_min=0, length_min=60, project="api"),
+                _session("b", start_min=30, length_min=60, project="api"),
+            ]
+        )
+    )
+    assert totals["api"] == 1.5
+
+
+def test_project_hours_excludes_unknown() -> None:
+    from amnesia.memory.analytics import project_hours
+
+    names = [n for n, _ in project_hours([_session("a", project="unknown")])]
+    assert names == []

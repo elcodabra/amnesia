@@ -107,7 +107,7 @@ Without a key it still runs. Ingestion, measured facts, stuck detection and the 
 
 ```bash
 .venv/bin/python scripts/demo_check.py   # is everything working? what are my numbers?
-.venv/bin/python -m pytest tests/ -q     # 67 tests, no network, no cloud
+.venv/bin/python -m pytest tests/ -q     # 72 tests, no network, no cloud
 ```
 
 ## Deploy to Google Cloud
@@ -154,6 +154,9 @@ That last one is the point. Tell Claude Code a preference once, and Cursor knows
 | `POST /api/distill` | The background pass. Driven by Cloud Scheduler |
 | `POST /api/ingest` | Receive sessions pushed from a laptop |
 | `GET /api/profile` | Measured facts and stuck signals |
+| `GET /api/calendar` | Everything the dashboard needs, in one request |
+| `GET /api/day/{day}` | One day expanded: sessions, projects, opening messages |
+| `POST /mcp` | Remote MCP, so ChatGPT can connect to the same memory |
 | `GET /api/card.svg` | The Working Style Card |
 | `GET /api/health` | Liveness. Google's frontend intercepts `/healthz`, so this is the reachable one |
 

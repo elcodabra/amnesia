@@ -15,7 +15,13 @@ from pydantic import BaseModel
 from amnesia.agent.agent import AmnesiaAgent, measured_facts, run_distill_pass
 from amnesia.cards.card import build_card, render_svg, share_text
 from amnesia.ingest.sessions import collect_sessions
-from amnesia.memory.analytics import daily_breakdown, detect_stuck
+from amnesia.memory.analytics import (
+    daily_breakdown,
+    day_detail,
+    detect_stuck,
+    hour_histogram,
+    project_hours,
+)
 from amnesia.memory.store import get_store
 from amnesia.settings import settings
 from amnesia.web.page import PAGE
@@ -111,6 +117,56 @@ def profile() -> JSONResponse:
                 {"project": s.project, "severity": s.severity, "reason": s.reason}
                 for s in detect_stuck(sessions)[:5]
             ],
+        }
+    )
+
+
+@app.get("/api/calendar")
+def calendar() -> JSONResponse:
+    """Everything the dashboard needs in one request.
+
+    One call rather than four: the page renders as a whole, and four parallel
+    requests to a cold Cloud Run container is four cold starts of waiting.
+    """
+    sessions = collect_sessions(limit=settings.distill_batch)
+    style, _ = measured_facts()
+    return JSONResponse(
+        {
+            "days": daily_breakdown(sessions),
+            "hours": hour_histogram(sessions),
+            "projects": project_hours(sessions),
+            "totals": {
+                "sessions": style.total_sessions,
+                "active_hours": style.active_hours,
+                "span_days": style.span_days,
+                "chronotype": style.chronotype,
+                "focus": style.focus_label,
+                "peak_hour": style.peak_hour,
+                "median_minutes": style.median_session_minutes,
+                "switches": style.context_switches,
+                "clients": style.clients,
+            },
+            "stuck": [
+                {"project": s.project, "severity": s.severity, "reason": s.reason,
+                 "session_id": s.session_id}
+                for s in detect_stuck(sessions)
+            ],
+        }
+    )
+
+
+@app.get("/api/day/{day}")
+def day(day: str) -> JSONResponse:
+    """One day, expanded. What the calendar opens when a square is clicked."""
+    detail = day_detail(collect_sessions(limit=settings.distill_batch), day)
+    return JSONResponse(
+        {
+            "day": detail.day,
+            "active_hours": detail.active_hours,
+            "sessions": detail.sessions,
+            "projects": detail.projects,
+            "clients": detail.clients,
+            "entries": detail.entries,
         }
     )
 

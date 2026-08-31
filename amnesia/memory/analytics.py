@@ -225,3 +225,79 @@ def daily_breakdown(sessions: list[Session]) -> dict[str, float]:
         if session.started_at:
             by_day[session.started_at.astimezone().date().isoformat()].append(session)
     return {day: round(active_minutes(items) / 60, 1) for day, items in sorted(by_day.items())}
+
+@dataclass
+class DayDetail:
+    """One day, in enough detail to answer "what did I do then"."""
+
+    day: str
+    active_hours: float
+    sessions: int
+    projects: list[tuple[str, int]]
+    clients: list[tuple[str, int]]
+    entries: list[dict]
+
+
+def day_detail(sessions: list[Session], day: str) -> DayDetail:
+    """Everything about one local day.
+
+    Local rather than UTC throughout: a calendar is a human artefact, and a
+    session at 01:00 belongs to the night the person remembers, not to whatever
+    UTC calls it.
+    """
+    on_day = [
+        s
+        for s in sessions
+        if s.started_at and s.started_at.astimezone().date().isoformat() == day
+    ]
+    entries = []
+    for s in sorted(on_day, key=lambda s: s.started_at):
+        opening = next((t.text for t in s.user_turns if t.text.strip()), "")
+        entries.append(
+            {
+                "id": s.id,
+                "at": s.started_at.astimezone().strftime("%H:%M"),
+                "project": s.project,
+                "client": s.client,
+                "minutes": s.duration_minutes,
+                "turns": len(s.user_turns),
+                # The opening message is what the person actually asked for,
+                # which identifies a session far better than any title we could
+                # generate for it.
+                "opening": opening[:160].replace("\n", " "),
+            }
+        )
+    return DayDetail(
+        day=day,
+        active_hours=round(active_minutes(on_day) / 60, 1),
+        sessions=len(on_day),
+        projects=Counter(s.project for s in on_day if s.project != "unknown").most_common(),
+        clients=Counter(s.client for s in on_day).most_common(),
+        entries=entries,
+    )
+
+
+def hour_histogram(sessions: list[Session]) -> list[int]:
+    """Sessions started per local hour, 0..23. The shape of someone's day."""
+    hours = [0] * 24
+    for s in sessions:
+        if s.started_at:
+            hours[s.started_at.astimezone().hour] += 1
+    return hours
+
+
+def project_hours(sessions: list[Session]) -> list[tuple[str, float]]:
+    """Active hours per project, unioned within each project.
+
+    Summing per project and unioning globally would disagree, so each project
+    is unioned on its own: the parts can exceed the whole when work overlaps
+    across projects, and that is the honest reading.
+    """
+    by_project: dict[str, list[Session]] = defaultdict(list)
+    for s in sessions:
+        if s.project != "unknown":
+            by_project[s.project].append(s)
+    totals = [
+        (name, round(active_minutes(items) / 60, 1)) for name, items in by_project.items()
+    ]
+    return sorted(totals, key=lambda pair: pair[1], reverse=True)
