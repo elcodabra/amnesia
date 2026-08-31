@@ -35,6 +35,18 @@ class Settings:
     # distillation runs over every session, so per-call cost matters more than
     # peak reasoning.
     model: str = field(default_factory=lambda: os.environ.get("AMNESIA_MODEL", "gemini-3.5-flash"))
+    # Popular models return 503 under load, and a demo cannot pause for
+    # capacity. Fallbacks stay inside the same generation, so a degraded run is
+    # still a compliant one.
+    fallback_models: tuple[str, ...] = field(
+        default_factory=lambda: tuple(
+            m.strip()
+            for m in os.environ.get(
+                "AMNESIA_FALLBACK_MODELS", "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
+            ).split(",")
+            if m.strip()
+        )
+    )
     google_api_key: str = field(default_factory=lambda: os.environ.get("GOOGLE_API_KEY", ""))
     use_vertex: bool = field(default_factory=lambda: _flag("GOOGLE_GENAI_USE_VERTEXAI"))
     project: str = field(default_factory=lambda: os.environ.get("GOOGLE_CLOUD_PROJECT", ""))

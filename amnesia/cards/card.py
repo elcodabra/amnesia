@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from amnesia.memory.analytics import WorkingStyle
 from amnesia.memory.store import Belief
+from amnesia.model import generate
 from amnesia.settings import settings
 
 NICKNAME_PROMPT = """Here is a developer's measured working profile:
@@ -66,14 +67,6 @@ def build_card(style: WorkingStyle, beliefs: list[Belief]) -> Card:
 
     if settings.has_model_access:
         try:
-            from google import genai
-
-            client = genai.Client(
-                vertexai=settings.use_vertex or None,
-                api_key=settings.google_api_key or None,
-                project=settings.project or None,
-                location=settings.location if settings.use_vertex else None,
-            )
             prompt = NICKNAME_PROMPT.format(
                 sessions=style.total_sessions,
                 days=style.span_days,
@@ -86,11 +79,11 @@ def build_card(style: WorkingStyle, beliefs: list[Belief]) -> Card:
                 switches=style.context_switches,
                 beliefs="\n".join(f"- {c}" for c in top) or "- nothing distilled yet",
             )
-            response = client.models.generate_content(model=settings.model, contents=prompt)
             import json
             import re
 
-            text = re.sub(r"^```(?:json)?|```$", "", (response.text or "").strip()).strip()
+            reply = generate(prompt)
+            text = re.sub(r"^```(?:json)?|```$", "", reply.text.strip()).strip()
             parsed = json.loads(text)
             nickname = str(parsed.get("nickname") or nickname)[:40]
             line = str(parsed.get("line") or line)[:140]

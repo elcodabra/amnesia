@@ -22,6 +22,7 @@ import re
 from dataclasses import dataclass
 
 from amnesia.ingest.sessions import Session
+from amnesia.model import generate
 from amnesia.memory.store import BELIEF_KINDS, Belief, get_store
 from amnesia.settings import settings
 
@@ -148,14 +149,6 @@ def distill(sessions: list[Session], max_beliefs: int = 8, persist: bool = True)
             error="no Gemini credentials: set GOOGLE_API_KEY or use Vertex AI",
         )
 
-    from google import genai
-
-    client = genai.Client(
-        vertexai=settings.use_vertex or None,
-        api_key=settings.google_api_key or None,
-        project=settings.project or None,
-        location=settings.location if settings.use_vertex else None,
-    )
     prompt = DISTILL_PROMPT.format(
         max_beliefs=max_beliefs,
         kinds=", ".join(BELIEF_KINDS),
@@ -163,8 +156,8 @@ def distill(sessions: list[Session], max_beliefs: int = 8, persist: bool = True)
     )
 
     try:
-        response = client.models.generate_content(model=settings.model, contents=prompt)
-        text = response.text or ""
+        reply = generate(prompt)
+        text, model_used = reply.text, reply.model
     except Exception as exc:  # noqa: BLE001 - a failed pass must not kill the job
         return DistillResult(
             beliefs=[], sessions_read=len(sessions), model_used=settings.model, error=str(exc)
@@ -182,4 +175,4 @@ def distill(sessions: list[Session], max_beliefs: int = 8, persist: bool = True)
         for belief in beliefs:
             store.upsert(belief)
 
-    return DistillResult(beliefs=beliefs, sessions_read=len(sessions), model_used=settings.model)
+    return DistillResult(beliefs=beliefs, sessions_read=len(sessions), model_used=model_used)

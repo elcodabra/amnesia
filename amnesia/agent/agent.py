@@ -210,20 +210,29 @@ TOOL_SCHEMA = [
 class AmnesiaAgent:
     """Gemini agent with memory, tools and a bias toward asking one good question."""
 
-    def __init__(self) -> None:
-        self._client = None
+    def _run(self, contents, config):
+        """One model call, falling back to another model on a capacity failure.
 
-    def _get_client(self):
-        if self._client is None:
-            from google import genai
+        The tool loop calls this repeatedly, so the fallback has to live here
+        rather than around the whole conversation: losing three turns of tool
+        results because the fourth call hit a busy model would be worse than
+        the original failure.
+        """
+        from amnesia.model import RETRYABLE, get_client, model_chain
 
-            self._client = genai.Client(
-                vertexai=settings.use_vertex or None,
-                api_key=settings.google_api_key or None,
-                project=settings.project or None,
-                location=settings.location if settings.use_vertex else None,
-            )
-        return self._client
+        client = get_client()
+        last: Exception | None = None
+        for model in model_chain():
+            try:
+                return client.models.generate_content(
+                    model=model, contents=contents, config=config
+                )
+            except Exception as exc:  # noqa: BLE001 - decided by failure kind
+                last = exc
+                if not any(token in str(exc) for token in RETRYABLE):
+                    raise
+                print(f"[amnesia] {model} unavailable, trying next model")
+        raise last if last else RuntimeError("No model available")
 
     def system_prompt(self) -> str:
         _, facts = measured_facts()
@@ -243,7 +252,6 @@ class AmnesiaAgent:
 
         from google.genai import types
 
-        client = self._get_client()
         contents = []
         for turn in history or []:
             contents.append(
@@ -258,6 +266,11 @@ class AmnesiaAgent:
             system_instruction=self.system_prompt(),
             tools=[types.Tool(function_declarations=TOOL_SCHEMA)],
             temperature=0.7,
+            # A partner that takes forty seconds to ask one question is not a
+            # partner. The memory is already in the system prompt, so the model
+            # is choosing a question rather than working anything out, and a
+            # small thinking budget is enough for that.
+            thinking_config=types.ThinkingConfig(thinking_level="low"),
         )
 
         called: list[str] = []
@@ -265,9 +278,7 @@ class AmnesiaAgent:
         # the classic way an agent burns a budget in the background.
         for _ in range(4):
             try:
-                response = client.models.generate_content(
-                    model=settings.model, contents=contents, config=config
-                )
+                response = self._run(contents, config)
             except Exception as exc:  # noqa: BLE001
                 return AgentReply(text=f"Model call failed: {exc}", tool_calls=called)
 
