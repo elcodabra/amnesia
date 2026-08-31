@@ -8,7 +8,7 @@ container scales to zero between runs.
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel
 
@@ -152,6 +152,45 @@ def ingest(req: IngestRequest) -> JSONResponse:
 def distill_endpoint(limit: int | None = None) -> JSONResponse:
     """The background pass. Triggered by Cloud Scheduler in production."""
     return JSONResponse(run_distill_pass(limit))
+
+
+@app.post("/mcp")
+async def mcp_endpoint(request: Request) -> Response:
+    """Remote MCP over Streamable HTTP, so ChatGPT can connect to this memory.
+
+    The stdio bridge only works for clients that spawn a local process. ChatGPT
+    connects to a URL, so the same tools are served here.
+    """
+    from amnesia.mcp.remote import as_sse, handle_remote
+
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001 - a malformed body is a protocol error, not a crash
+        return JSONResponse(
+            {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}},
+            status_code=400,
+        )
+
+    # Notifications get 202 with no body: answering one makes a client decide
+    # the server is broken.
+    response = handle_remote(payload)
+    if response is None:
+        return Response(status_code=202)
+
+    # Streamable HTTP allows JSON or SSE. Honour what the client asked for.
+    if "text/event-stream" in (request.headers.get("accept") or ""):
+        return Response(content=as_sse(response), media_type="text/event-stream")
+    return JSONResponse(response)
+
+
+@app.get("/mcp")
+def mcp_probe() -> Response:
+    """Some clients probe with GET before opening a session.
+
+    405 is the honest answer: the endpoint exists, but this transport carries
+    requests over POST. A 404 here reads as "no server".
+    """
+    return Response(status_code=405, headers={"Allow": "POST"})
 
 
 @app.get("/api/card.svg")
