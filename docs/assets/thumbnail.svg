@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/>
+      <stop offset="55%" stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#64748b" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#64748b" stop-opacity="0.15"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="800" fill="url(#bg)"/>
+
+  <!-- The four clients, each forgetting, and the one that does not. -->
+  <g font-family="Helvetica,Arial,sans-serif">
+    <rect x="80" y="88" width="88" height="6" rx="3" fill="url(#accent)"/>
+
+    <text x="80" y="230" fill="#f8fafc" font-size="86" font-weight="700">Amnesia</text>
+
+    <text x="80" y="300" fill="#a5b4fc" font-size="34">
+      Your AI agents forget you every morning.
+    </text>
+    <text x="80" y="352" fill="#f8fafc" font-size="34" font-weight="600">
+      This one doesn't.
+    </text>
+
+    <line x1="80" y1="412" x2="1120" y2="412" stroke="#334155" stroke-width="1"/>
+
+    <!-- Clients it reads from. Naming them is the fastest way to say what it does. -->
+    <text x="80" y="464" fill="#64748b" font-size="18" letter-spacing="3">
+      READS YOUR REAL SESSIONS FROM
+    </text>
+    <text x="80" y="516" fill="#cbd5f5" font-size="30">
+      Claude Code · Cursor · Codex · jcode
+    </text>
+
+    <text x="80" y="590" fill="#64748b" font-size="18" letter-spacing="3">
+      LEARNS HOW YOU ACTUALLY WORK
+    </text>
+    <text x="80" y="642" fill="#cbd5f5" font-size="30">
+      Every belief cites the sessions behind it
+    </text>
+
+    <line x1="80" y1="700" x2="1120" y2="700" stroke="#334155" stroke-width="1"/>
+    <text x="80" y="742" fill="#818cf8" font-size="22">
+      Gemini 3.5 Flash · Cloud Run · Firestore · MCP
+    </text>
+  </g>
+</svg>
