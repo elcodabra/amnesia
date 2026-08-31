@@ -204,7 +204,10 @@ def detect_stuck(sessions: list[Session], min_turns: int = 8) -> list[StuckSigna
             signals.append(
                 StuckSignal(
                     session_id=session.id,
-                    project=session.project,
+                    # Naming the client is more useful than naming nothing: on
+                    # a session whose project could not be resolved, "unknown"
+                    # tells the user less than the tool they were using.
+                    project=session.project if session.project != "unknown" else session.client,
                     reason="; ".join(reasons),
                     severity=round(min(severity, 1.0), 2),
                     evidence=worst_repeat or texts[-1][:60],

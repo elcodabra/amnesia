@@ -276,3 +276,16 @@ def test_unknown_is_not_counted_as_a_project() -> None:
     ]
     projects = analyse(sessions).projects
     assert [name for name, _ in projects] == ["real-thing"]
+
+
+def test_stuck_signal_names_the_client_when_the_project_is_unknown() -> None:
+    """"Stuck on unknown" tells a user nothing; the tool they used tells them something."""
+    session = _session(
+        "loop",
+        length_min=120,
+        project="unknown",
+        user_texts=["the build still fails with the same error"] * 5 + ["still broken"] * 4,
+    )
+    session.client = "claude-code"
+    signals = detect_stuck([session])
+    assert signals and signals[0].project == "claude-code"
