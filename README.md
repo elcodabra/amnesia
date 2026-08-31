@@ -87,6 +87,7 @@ flowchart TB
 | Gemini 3.5 or newer | `gemini-3.5-flash` via `google-genai`, for distillation, the agent loop and the card |
 | Google Agent Framework | Google GenAI SDK with declared function tools and a bounded tool loop |
 | Google Cloud infrastructure | Cloud Run (service), Firestore (memory), Cloud Scheduler (background pass), Cloud Build (image) |
+| Reach beyond the app | MCP server, so Claude Code and Cursor read the same memory |
 
 ## Run it locally
 
@@ -107,7 +108,7 @@ Open <http://localhost:8080>, click **Run background pass**, and watch it learn 
 Without a key it still runs: ingestion, measured facts, stuck detection and the card all work with no model at all.
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 27 tests, no network, no cloud
+.venv/bin/python -m pytest tests/ -q     # 35 tests, no network, no cloud
 ```
 
 ## Deploy to Google Cloud
@@ -130,6 +131,18 @@ curl -X POST https://your-service.run.app/api/distill
 ```
 
 Only normalised conversation turns leave your machine. Tool output, file contents, reasoning traces and paths are stripped during ingestion, before anything is sent.
+
+## The part that makes it infrastructure
+
+A web UI proves the agent works. The MCP bridge proves it is memory.
+
+```bash
+./scripts/install-mcp.sh    # registers Amnesia in Claude Code and Cursor
+```
+
+Restart the client and ask it "what do you know about how I work?". It answers from the same beliefs the background pass fills, with the same evidence. Four tools are exposed: `recall_me`, `how_i_work`, `am_i_stuck` and `remember_about_me`.
+
+That last one is the point. Tell Claude Code a preference once, and Cursor knows it too.
 
 ## API
 
