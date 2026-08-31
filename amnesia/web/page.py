@@ -43,6 +43,11 @@ PAGE = r"""<!doctype html>
   .wrap { max-width:1240px; margin:0 auto; padding:22px 28px 70px; }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
   @media (max-width:1000px){ .grid { grid-template-columns:1fr; } }
+  /* The calendar is the thing people navigate their own history with, so it
+     gets the full width rather than half a column. */
+  .full { margin-bottom:18px; }
+  .cal-row { display:grid; grid-template-columns:1.55fr 1fr; gap:20px; align-items:start; }
+  @media (max-width:960px){ .cal-row { grid-template-columns:1fr; } }
 
   .card {
     background:var(--panel); border:1px solid var(--line);
@@ -67,19 +72,28 @@ PAGE = r"""<!doctype html>
   .stat em { display:block; font-style:normal; font-size:12px; color:var(--dim); margin-top:3px; }
 
   /* ---- calendar ---- */
-  .months { display:flex; gap:26px; flex-wrap:wrap; }
-  .month-label { font-size:12px; color:var(--muted); margin-bottom:8px; }
-  .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; }
-  .dow { font-size:10px; color:var(--dim); text-align:center; padding-bottom:2px; }
+  .months { display:flex; gap:34px; flex-wrap:wrap; }
+  .month { flex:1 1 300px; min-width:290px; }
+  .month-label {
+    font-size:14px; color:var(--text); margin-bottom:10px; font-weight:600;
+  }
+  .month-label small { color:var(--dim); font-weight:400; margin-left:7px; font-size:12px; }
+  .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:7px; }
+  .dow { font-size:11px; color:var(--dim); text-align:center; padding-bottom:4px; }
   .day {
-    aspect-ratio:1; border-radius:6px; background:#0e1626; border:1px solid #1b2540;
-    display:flex; align-items:center; justify-content:center;
-    font-size:11px; color:var(--dim); cursor:default; position:relative;
+    aspect-ratio:1; border-radius:9px; background:#0e1626; border:1px solid #1b2540;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:15px; color:var(--dim); cursor:default; position:relative;
+    transition:transform .08s ease;
   }
   .day.has { cursor:pointer; color:#04101f; font-weight:700; border-color:transparent; }
-  .day.has:hover { outline:2px solid var(--a1); outline-offset:1px; }
-  .day.sel { outline:2px solid var(--a2); outline-offset:1px; }
+  .day.has:hover { outline:2px solid var(--a1); outline-offset:2px; transform:translateY(-1px); }
+  .day.sel { outline:3px solid var(--a2); outline-offset:2px; }
   .day.empty { background:transparent; border-color:transparent; }
+  /* The hours are the point of the calendar, so they are printed rather than
+     hidden in a tooltip nobody hovers during a demo. */
+  .day .hrs { font-size:10px; font-weight:600; opacity:.72; margin-top:1px; }
+  .day.today { box-shadow:inset 0 0 0 1.5px var(--a1); }
   .legend { display:flex; align-items:center; gap:7px; margin-top:12px;
             font-size:11.5px; color:var(--dim); }
   .sw { width:13px; height:13px; border-radius:3px; }
@@ -149,8 +163,8 @@ PAGE = r"""<!doctype html>
 <div class="wrap">
   <div class="stats" id="stats"></div>
 
-  <div class="grid">
-    <div>
+  <div class="full">
+    <div class="cal-row">
       <div class="card">
         <h2>When you actually worked</h2>
         <p class="hint">Counted from real sessions. Overlapping clients count once, not twice. Click any day.</p>
@@ -162,6 +176,7 @@ PAGE = r"""<!doctype html>
           <span class="sw" style="background:#3b82f6"></span>
           <span class="sw" style="background:#93c5fd"></span>
           <span>more</span>
+          <span style="margin-left:auto">numbers on a day are hours worked</span>
         </div>
       </div>
 
@@ -170,7 +185,11 @@ PAGE = r"""<!doctype html>
         <p class="hint" id="day-sum"></p>
         <div id="day-entries"></div>
       </div>
+    </div>
+  </div>
 
+  <div class="grid">
+    <div>
       <div class="card">
         <h2>The shape of your day</h2>
         <p class="hint">Sessions started per hour, local time</p>
@@ -265,24 +284,38 @@ function renderCalendar(days) {
   const months = [...new Set(keys.map(k => k.slice(0, 7)))].sort();
   const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
   $('calendar').innerHTML = months.map(m => {
     const [y, mo] = m.split('-').map(Number);
     const first = new Date(y, mo - 1, 1);
     // Monday-first: the week people plan in, not the week the US prints.
     const offset = (first.getDay() + 6) % 7;
     const total = new Date(y, mo, 0).getDate();
+    let monthHours = 0, monthDays = 0;
+
     let cells = ['Mo','Tu','We','Th','Fr','Sa','Su'].map(d => `<div class="dow">${d}</div>`).join('');
     cells += Array(offset).fill('<div class="day empty"></div>').join('');
     for (let d = 1; d <= total; d++) {
       const key = `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const h = days[key] || 0;
       const bg = shade(h, max);
+      const isToday = key === todayKey ? ' today' : '';
+      if (h) { monthHours += h; monthDays++; }
       cells += bg
-        ? `<div class="day has" style="background:${bg}" data-day="${key}"
-             title="${key}: ${h}h" onclick="openDay('${key}')">${d}</div>`
-        : `<div class="day">${d}</div>`;
+        ? `<div class="day has${isToday}" style="background:${bg}" data-day="${key}"
+             title="${key}: ${h}h" onclick="openDay('${key}')">${d}<span class="hrs">${h}h</span></div>`
+        : `<div class="day${isToday}">${d}</div>`;
     }
-    return `<div><div class="month-label">${names[mo-1]} ${y}</div><div class="cal">${cells}</div></div>`;
+    // A month header that states the month's own total, so the calendar is
+    // readable without clicking anything.
+    return `<div class="month">
+      <div class="month-label">${names[mo-1]} ${y}
+        <small>${monthHours.toFixed(1)}h over ${monthDays} day${monthDays === 1 ? '' : 's'}</small>
+      </div>
+      <div class="cal">${cells}</div>
+    </div>`;
   }).join('');
 }
 
