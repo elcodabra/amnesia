@@ -109,3 +109,53 @@ def test_sse_frame_is_well_formed() -> None:
     assert frame.endswith("\n\n")
     body = frame.split("data: ", 1)[1].strip()
     assert json.loads(body)["jsonrpc"] == "2.0"
+
+
+def test_recency_questions_get_sessions_not_beliefs(monkeypatch) -> None:
+    """Observed live: ChatGPT asked three recency questions in a row.
+
+    Each returned the same evidence-ranked beliefs, so it rephrased and tried
+    again instead of answering. "What did I do recently" is a question about
+    time, and beliefs are ordered by evidence, which is the wrong axis.
+    """
+    from datetime import datetime, timezone
+
+    import amnesia.mcp.remote as remote
+    from amnesia.ingest.sessions import Session, Turn
+
+    session = Session(
+        id="s-recent",
+        client="cursor",
+        project="backoffice",
+        started_at=datetime(2026, 8, 30, 10, tzinfo=timezone.utc),
+        ended_at=datetime(2026, 8, 30, 11, tzinfo=timezone.utc),
+        turns=[Turn(role="user", text="fix the failing checkout test")],
+    )
+    monkeypatch.setattr(
+        "amnesia.ingest.sessions.collect_sessions", lambda limit=10: [session]
+    )
+
+    for question in (
+        "my most recent activities, newest first",
+        "what did I work on lately",
+        "what did I do today",
+    ):
+        answer = remote._search(question)
+        assert "s-recent" in answer, question
+        assert "checkout test" in answer, question
+        assert "2026-08-30" in answer, question
+
+
+def test_topic_questions_still_return_beliefs() -> None:
+    """Fixing recency must not break the question the tool was built for."""
+    from amnesia.mcp.remote import _search
+
+    assert "friction-abc" in _search("nvmrc")
+
+
+def test_recency_falls_back_to_beliefs_when_no_sessions(monkeypatch) -> None:
+    """An empty answer reads as "no memory"; showing what is known is better."""
+    import amnesia.mcp.remote as remote
+
+    monkeypatch.setattr("amnesia.ingest.sessions.collect_sessions", lambda limit=10: [])
+    assert "friction-abc" in remote._search("what did I do recently")

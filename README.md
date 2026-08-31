@@ -107,7 +107,7 @@ Without a key it still runs. Ingestion, measured facts, stuck detection and the 
 
 ```bash
 .venv/bin/python scripts/demo_check.py   # is everything working? what are my numbers?
-.venv/bin/python -m pytest tests/ -q     # 64 tests, no network, no cloud
+.venv/bin/python -m pytest tests/ -q     # 67 tests, no network, no cloud
 ```
 
 ## Deploy to Google Cloud

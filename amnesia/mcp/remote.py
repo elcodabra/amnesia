@@ -19,13 +19,55 @@ from amnesia.memory.store import get_store
 PROTOCOL_VERSION = "2024-11-05"
 
 
-def _search(query: str = "") -> str:
-    """ChatGPT's required search tool, over stored beliefs.
+# Questions about *when*, not about *what*. Beliefs are ranked by how much
+# evidence supports them, which is the wrong order for "what did I do
+# yesterday": the answer would be the same durable claims every time. Observed
+# live: ChatGPT asked three recency questions in a row, got the same list back
+# each time, and rephrased rather than giving up.
+RECENCY = (
+    "recent", "recently", "latest", "last", "newest", "today", "yesterday",
+    "this week", "just now", "currently", "right now", "lately", "newest first",
+)
 
-    Returns the id alongside each result, because `fetch` is only useful if the
+
+def _looks_like_recency(query: str) -> bool:
+    return any(word in query for word in RECENCY)
+
+
+def _recent_sessions(limit: int = 10) -> str:
+    """Actual sessions, newest first. The answer to a question about time."""
+    from amnesia.ingest.sessions import collect_sessions
+
+    sessions = collect_sessions(limit=limit)
+    if not sessions:
+        return ""
+    lines = []
+    for s in sessions[:limit]:
+        when = s.started_at.astimezone().strftime("%Y-%m-%d %H:%M") if s.started_at else "unknown"
+        first = next((t.text for t in s.user_turns if t.text.strip()), "")
+        topic = first[:90].replace("\n", " ") or "(no opening message)"
+        lines.append(
+            f"[session:{s.id}] {when} · {s.project} · {s.client} · "
+            f"{s.duration_minutes:.0f} min — {topic}"
+        )
+    return "\n".join(lines)
+
+
+def _search(query: str = "") -> str:
+    """ChatGPT's required search tool.
+
+    Answers two different questions, because a model asking either one will use
+    this tool: what is known about the person, and what they did recently. The
+    ids come back with every result, because `fetch` is only useful if the
     model can tell it which record to open.
     """
     needle = (query or "").lower().strip()
+
+    if _looks_like_recency(needle):
+        recent = _recent_sessions()
+        if recent:
+            return "Most recent sessions, newest first:\n" + recent
+
     beliefs = [b for b in get_store().all() if b.status == "active"]
     if needle:
         matched = [
