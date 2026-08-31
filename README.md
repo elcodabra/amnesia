@@ -4,6 +4,8 @@
 
 Built for the [All Things Agentic Hackathon](https://allthingsagentichackathon.devpost.com/) · Track: **The Collaborative Partner**
 
+**Live:** <https://amnesia-orkuraibfa-uc.a.run.app>
+
 ---
 
 ## The problem
@@ -105,7 +107,7 @@ Without a key it still runs. Ingestion, measured facts, stuck detection and the 
 
 ```bash
 .venv/bin/python scripts/demo_check.py   # is everything working? what are my numbers?
-.venv/bin/python -m pytest tests/ -q     # 50 tests, no network, no cloud
+.venv/bin/python -m pytest tests/ -q     # 51 tests, no network, no cloud
 ```
 
 ## Deploy to Google Cloud
@@ -118,7 +120,7 @@ export GOOGLE_API_KEY=your_key
 ./scripts/deploy.sh
 ```
 
-The script enables the APIs, creates the Firestore database, deploys to Cloud Run and registers the hourly Cloud Scheduler job. It is safe to re-run.
+It enables the APIs, waits for Artifact Registry, creates the Firestore database, deploys to Cloud Run and registers the hourly Cloud Scheduler job. Safe to re-run.
 
 Then push your local history to it, so the deployed agent has something to learn from:
 
@@ -153,7 +155,7 @@ That last one is the point. Tell Claude Code a preference once, and Cursor knows
 | `POST /api/ingest` | Receive sessions pushed from a laptop |
 | `GET /api/profile` | Measured facts and stuck signals |
 | `GET /api/card.svg` | The Working Style Card |
-| `GET /healthz` | Liveness for Cloud Run |
+| `GET /api/health` | Liveness. Google's frontend intercepts `/healthz`, so this is the reachable one |
 
 ## What I learned building this
 
@@ -164,3 +166,7 @@ That last one is the point. Tell Claude Code a preference once, and Cursor knows
 **A memory without provenance cannot be corrected.** Once every belief carried its sessions, "that's wrong" became a one-click action with somewhere to put the correction, instead of an argument with a model.
 
 **Truncate from the front.** The outcome of a session is at the end: whether it worked, or whether the person gave up. Early versions truncated the tail and distilled the greeting.
+
+**Cloud Run sets `GOOGLE_CLOUD_PROJECT` on every service.** Passed alongside an API key, the Gemini API rejects the call outright. The first deployed distill pass failed on exactly this while the same code worked locally, so the two credential modes are now separate paths rather than one call with optional arguments.
+
+**The model everyone is demoing on returns 503.** `gemini-3.5-flash` was unavailable under load while `flash-lite` answered in under a second. A live demo cannot pause for capacity, so capacity failures fall through to the next model in the same generation. Bad requests deliberately do not, because retrying a malformed prompt just fails three times more slowly.

@@ -289,3 +289,14 @@ def test_stuck_signal_names_the_client_when_the_project_is_unknown() -> None:
     session.client = "claude-code"
     signals = detect_stuck([session])
     assert signals and signals[0].project == "claude-code"
+
+
+def test_card_line_is_clipped_on_a_word_boundary() -> None:
+    """A line cut mid-word looks like a bug on an image about to be posted."""
+    from amnesia.cards.card import _fit
+
+    assert _fit("short line", 74) == "short line"
+    clipped = _fit("your custom session-tracking hooks transform rapid sprints into bulletproof work", 40)
+    assert len(clipped) <= 40
+    assert clipped.endswith("…")
+    assert not clipped[:-1].endswith(" ")

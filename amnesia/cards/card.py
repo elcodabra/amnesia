@@ -31,8 +31,9 @@ And what has been learned about how they work:
 {beliefs}
 
 Give them a two-or-three word nickname that captures their working style, plus
-one sentence (max 18 words) they would find flattering but true. Be specific to
-this data, never generic.
+one short sentence they would find flattering but true. The sentence MUST be
+under 70 characters, because it is rendered on a single line of a card and is
+cut off beyond that. Be specific to this data, never generic.
 
 Return ONLY JSON: {{"nickname": "...", "line": "..."}}
 """
@@ -97,6 +98,20 @@ def _esc(text: str) -> str:
     return html.escape(text, quote=True)
 
 
+def _fit(text: str, limit: int) -> str:
+    """Clip to the width of the card, ending on a word.
+
+    A line cut mid-word reads as a bug on an image someone is about to
+    post publicly.
+    """
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1]
+    if " " in cut:
+        cut = cut.rsplit(" ", 1)[0]
+    return cut.rstrip(",.;:") + "…"
+
+
 def render_svg(card: Card) -> str:
     """Self-contained SVG. No external fonts, no images, safe to embed."""
     s = card.style
@@ -147,7 +162,7 @@ def render_svg(card: Card) -> str:
   <text x="60" y="176" fill="#f8fafc" font-size="46" font-weight="700"
         font-family="Helvetica,Arial,sans-serif">{_esc(card.nickname)}</text>
   <text x="60" y="216" fill="#a5b4fc" font-size="18"
-        font-family="Helvetica,Arial,sans-serif">{_esc(card.line[:74])}</text>
+        font-family="Helvetica,Arial,sans-serif">{_esc(_fit(card.line, 74))}</text>
   <line x1="60" y1="252" x2="620" y2="252" stroke="#334155" stroke-width="1"/>
   {stat_svg}
   <text x="60" y="398" fill="#64748b" font-size="13" letter-spacing="2.5"
