@@ -108,6 +108,8 @@ def handle_remote(request: dict) -> dict | None:
         return None
 
     if method == "initialize":
+        client = (request.get("params") or {}).get("clientInfo") or {}
+        print(f"[amnesia] mcp connected: {client.get('name', 'unknown')} {client.get('version', '')}")
         return {
             "jsonrpc": "2.0",
             "id": request_id,
@@ -131,6 +133,10 @@ def handle_remote(request: dict) -> dict | None:
                 "id": request_id,
                 "error": {"code": -32601, "message": f"Unknown tool: {name}"},
             }
+        # Logged because a remote client is a black box: without this, a
+        # connector that silently never calls a tool looks identical to one
+        # that calls it and gets nothing back.
+        print(f"[amnesia] mcp tool={name} args={json.dumps(params.get('arguments') or {})[:120]}")
         try:
             text = fn(**(params.get("arguments") or {}))
         except Exception as exc:  # noqa: BLE001 - a tool error is a result, not a crash
@@ -142,6 +148,7 @@ def handle_remote(request: dict) -> dict | None:
                     "isError": True,
                 },
             }
+        print(f"[amnesia] mcp tool={name} returned {len(text)} chars")
         return {
             "jsonrpc": "2.0",
             "id": request_id,
