@@ -98,3 +98,51 @@ def test_missing_credentials_are_reported_clearly(monkeypatch) -> None:
     monkeypatch.setattr(model_layer, "_client", None)
     with pytest.raises(model_layer.NoModelAccess, match="GOOGLE_API_KEY"):
         model_layer.get_client()
+
+
+def test_api_key_and_project_are_never_sent_together(monkeypatch) -> None:
+    """Cloud Run sets GOOGLE_CLOUD_PROJECT on every service.
+
+    Passing it alongside an API key makes the Gemini API reject the call with
+    "does not support project/location", which only shows up once deployed.
+    """
+    captured: dict = {}
+
+    class _Genai:
+        @staticmethod
+        def Client(**kwargs):  # noqa: N802 - mirrors the SDK's name
+            captured.update(kwargs)
+            return object()
+
+    monkeypatch.setattr(
+        model_layer,
+        "settings",
+        Settings(google_api_key="key", use_vertex=False, project="some-project"),
+    )
+    monkeypatch.setattr(model_layer, "_client", None)
+    monkeypatch.setattr("google.genai.Client", _Genai.Client, raising=False)
+
+    model_layer.get_client()
+    assert captured.get("api_key") == "key"
+    assert "project" not in captured
+    assert "location" not in captured
+
+
+def test_vertex_mode_sends_project_and_no_key(monkeypatch) -> None:
+    captured: dict = {}
+    monkeypatch.setattr(
+        model_layer,
+        "settings",
+        Settings(google_api_key="key", use_vertex=True, project="p", location="us-central1"),
+    )
+    monkeypatch.setattr(model_layer, "_client", None)
+    monkeypatch.setattr(
+        "google.genai.Client",
+        lambda **kw: (captured.update(kw), object())[1],
+        raising=False,
+    )
+
+    model_layer.get_client()
+    assert captured.get("vertexai") is True
+    assert captured.get("project") == "p"
+    assert "api_key" not in captured

@@ -50,9 +50,15 @@ def index() -> str:
     return PAGE
 
 
+@app.get("/api/health", response_class=PlainTextResponse)
 @app.get("/healthz", response_class=PlainTextResponse)
 def healthz() -> str:
-    """Liveness for Cloud Run. Deliberately does no work and touches nothing."""
+    """Liveness. Deliberately does no work and touches nothing.
+
+    Served on two paths because Google's frontend intercepts `/healthz` before
+    the request reaches the container, so the conventional name answers 404
+    from outside while working perfectly inside.
+    """
     return "ok"
 
 

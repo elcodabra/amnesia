@@ -32,7 +32,20 @@ $GCLOUD services enable \
   firestore.googleapis.com \
   aiplatform.googleapis.com \
   cloudscheduler.googleapis.com \
+  artifactregistry.googleapis.com \
   --project "$PROJECT"
+
+# A source deploy pushes the built image into Artifact Registry, and on a fresh
+# project the repository does not exist yet. Cloud Run creates it on demand,
+# but only once the API has finished propagating, which takes longer than the
+# enable call returns.
+echo "==> Waiting for Artifact Registry to become available"
+for _ in $(seq 1 12); do
+  if $GCLOUD artifacts repositories list --location "$REGION" --project "$PROJECT" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 10
+done
 
 # ------------------------------------------------------------- Firestore
 # Firestore refuses a second database in the same project, and that error is

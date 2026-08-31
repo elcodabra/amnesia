@@ -10,9 +10,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import urllib.request
+from pathlib import Path
 
-from amnesia.ingest.sessions import collect_sessions
+# Run as a script from anywhere, not only from the repo root with PYTHONPATH
+# set. A setup step that fails on the obvious invocation is a setup step that
+# will be reported as broken.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from amnesia.ingest.sessions import collect_sessions  # noqa: E402
 
 
 def main() -> None:

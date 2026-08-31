@@ -46,12 +46,18 @@ def get_client():
             )
         from google import genai
 
-        _client = genai.Client(
-            vertexai=settings.use_vertex or None,
-            api_key=settings.google_api_key or None,
-            project=settings.project or None,
-            location=settings.location if settings.use_vertex else None,
-        )
+        # An API key and a project/location are mutually exclusive: the Gemini
+        # API rejects the call outright when both are passed. Cloud Run sets
+        # GOOGLE_CLOUD_PROJECT on every service, so this combination happens by
+        # default rather than by mistake, and the key is the explicit choice.
+        if settings.use_vertex:
+            _client = genai.Client(
+                vertexai=True,
+                project=settings.project or None,
+                location=settings.location,
+            )
+        else:
+            _client = genai.Client(api_key=settings.google_api_key)
     return _client
 
 
