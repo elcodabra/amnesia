@@ -31,9 +31,17 @@ And what has been learned about how they work:
 {beliefs}
 
 Give them a two-or-three word nickname that captures their working style, plus
-one short sentence they would find flattering but true. The sentence MUST be
-under 70 characters, because it is rendered on a single line of a card and is
-cut off beyond that. Be specific to this data, never generic.
+one short sentence they would find flattering but true.
+
+Rules for the nickname:
+- Plain English only. No loanwords from other languages, no invented words.
+- Every word must be one a native English speaker uses without explanation.
+- It is printed on a card the person will post publicly, so it must read as a
+  compliment at a glance, not as a puzzle.
+
+The sentence MUST be under 70 characters, because it is rendered on a single
+line of a card and is cut off beyond that. Be specific to this data, never
+generic.
 
 Return ONLY JSON: {{"nickname": "...", "line": "..."}}
 """
