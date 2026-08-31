@@ -95,20 +95,17 @@ No Google Cloud account needed. Amnesia falls back to a local JSON store, and re
 
 ```bash
 git clone <this-repo> && cd amnesia
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-
-# Get a key at https://aistudio.google.com/apikey
-export GOOGLE_API_KEY=your_key
-
-.venv/bin/python -m uvicorn amnesia.web.app:app --port 8080
+echo 'GOOGLE_API_KEY=your_key' > .env    # from https://aistudio.google.com/apikey
+./scripts/quickstart.sh
 ```
 
-Open <http://localhost:8080>, click **Run background pass**, and watch it learn from your own sessions.
+That installs dependencies, checks what it can read on your machine, prints your real numbers, and serves <http://localhost:8080>. Click **Run background pass** and watch it learn from your own sessions.
 
-Without a key it still runs: ingestion, measured facts, stuck detection and the card all work with no model at all.
+Without a key it still runs. Ingestion, measured facts, stuck detection and the card all work with no model at all, so you can see it do something before deciding to give it credentials.
 
 ```bash
-.venv/bin/python -m pytest tests/ -q     # 35 tests, no network, no cloud
+.venv/bin/python scripts/demo_check.py   # is everything working? what are my numbers?
+.venv/bin/python -m pytest tests/ -q     # 39 tests, no network, no cloud
 ```
 
 ## Deploy to Google Cloud
