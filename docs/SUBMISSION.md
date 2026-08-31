@@ -1,5 +1,8 @@
 # Submission kit
 
+**Live:** <https://amnesia-orkuraibfa-uc.a.run.app>
+**Project:** `amnesia-agent-87425` · us-central1 · Cloud Run + Firestore + Cloud Scheduler
+
 Everything needed to submit, in the order Devpost asks for it. Numbers marked
 `[LIVE]` must be re-read from the running service before recording, because they
 change as sessions accumulate and a stale figure on screen is the fastest way to
@@ -151,8 +154,9 @@ This is the section judges score for Production Readiness. Show, in order:
 
 1. Cloud Run console, service healthy, revision list.
 2. Cloud Scheduler job `amnesia-distill`, hourly schedule.
-3. `curl -X POST <URL>/api/distill` and the JSON that comes back: sessions read,
-   beliefs learned.
+3. `curl -X POST https://amnesia-orkuraibfa-uc.a.run.app/api/distill` and the
+   JSON that comes back: sessions read, beliefs learned. It takes about 90
+   seconds, so start it before you need it on screen.
 4. Firestore console, the `amnesia_memory` collection, one document expanded to
    show `evidence` and `confidence`.
 
@@ -204,10 +208,10 @@ Include `#AllThingsAgenticHackathon`. Attach the card image.
 ## 6. Pre-submission checklist
 
 - [ ] Repo public, or shared with `testing@devpost.com` and `cloudhackathons@google.com`
-- [ ] README has spin-up instructions that work on a clean clone
-- [ ] Architecture diagram present (mermaid in README, renders on GitHub)
+- [x] README has spin-up instructions that work on a clean clone
+- [x] Architecture diagram present (mermaid in README, renders on GitHub)
 - [ ] Demo video under 4 minutes, shows Google Cloud console
-- [ ] Category selected: **The Collaborative Partner**
-- [ ] Hosted URL provided (Cloud Run)
+- [x] Category selected: **The Collaborative Partner**
+- [x] Hosted URL provided: https://amnesia-orkuraibfa-uc.a.run.app
 - [ ] Social post published with `#AllThingsAgenticHackathon`
 - [ ] `[LIVE]` numbers re-read from the running service before recording
