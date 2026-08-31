@@ -1,8 +1,13 @@
 """Sessions uploaded from a laptop to a deployed instance.
 
 A deployed Amnesia cannot read transcript files on someone's machine, so the
-laptop pushes normalised sessions instead. They are kept in the same store as
-beliefs, which means one backend to configure and one thing to back up.
+laptop pushes normalised sessions instead.
+
+Where they are kept matters more than it looks. Cloud Run containers are
+disposable: the first version wrote them to the container filesystem, and the
+next revision started with an empty history, so the deployed agent silently
+forgot everything it had been given. Uploaded sessions now go to the same store
+as beliefs, which means Firestore in the cloud and a file locally.
 
 This is also the honest privacy boundary: what leaves the machine is turns of
 conversation, already stripped of tool output, file contents and reasoning
@@ -17,10 +22,6 @@ from pathlib import Path
 
 from amnesia.ingest.sessions import Session, Turn, _parse_ts
 from amnesia.settings import settings
-
-
-def _cache_path() -> Path:
-    return settings.local_store_path.parent / "sessions.json"
 
 
 def _from_payload(row: dict) -> Session | None:
@@ -55,8 +56,47 @@ def _serialise(session: Session) -> dict:
     }
 
 
-def save_uploaded(rows: list[dict]) -> int:
-    """Merge uploaded sessions into the cache, keyed by session id."""
+# --------------------------------------------------------------------------
+# Firestore backend, used when the service runs in the cloud
+# --------------------------------------------------------------------------
+
+
+def _collection():
+    from google.cloud import firestore
+
+    client = firestore.Client(project=settings.project or None)
+    # A sibling of the beliefs collection rather than a subcollection: sessions
+    # are evidence, beliefs are conclusions, and they are read at different
+    # times by different code.
+    return client.collection(f"{settings.firestore_collection}_sessions")
+
+
+def _save_firestore(rows: list[dict]) -> int:
+    col = _collection()
+    added = 0
+    for row in rows:
+        session = _from_payload(row) if isinstance(row, dict) else None
+        if not session:
+            continue
+        col.document(session.id).set(_serialise(session))
+        added += 1
+    return added
+
+
+def _load_firestore() -> list[Session]:
+    return [s for s in (_from_payload(doc.to_dict()) for doc in _collection().stream()) if s]
+
+
+# --------------------------------------------------------------------------
+# File backend, used locally
+# --------------------------------------------------------------------------
+
+
+def _cache_path() -> Path:
+    return settings.local_store_path.parent / "sessions.json"
+
+
+def _save_file(rows: list[dict]) -> int:
     path = _cache_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -82,7 +122,7 @@ def save_uploaded(rows: list[dict]) -> int:
     return added
 
 
-def load_uploaded() -> list[Session]:
+def _load_file() -> list[Session]:
     path = _cache_path()
     if not path.exists():
         return []
@@ -92,7 +132,34 @@ def load_uploaded() -> list[Session]:
         return []
     if not isinstance(rows, dict):
         return []
-    sessions = [s for s in (_from_payload(r) for r in rows.values()) if s]
+    return [s for s in (_from_payload(r) for r in rows.values()) if s]
+
+
+# --------------------------------------------------------------------------
+# Public interface. Firestore when configured, file otherwise, and file as the
+# fallback when Firestore is unreachable: an upload that half-works is worse
+# than one that lands somewhere.
+# --------------------------------------------------------------------------
+
+
+def save_uploaded(rows: list[dict]) -> int:
+    if settings.firestore_enabled:
+        try:
+            return _save_firestore(rows)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[amnesia] Firestore write failed ({exc}); falling back to file")
+    return _save_file(rows)
+
+
+def load_uploaded() -> list[Session]:
+    sessions: list[Session] = []
+    if settings.firestore_enabled:
+        try:
+            sessions = _load_firestore()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[amnesia] Firestore read failed ({exc}); falling back to file")
+    if not sessions:
+        sessions = _load_file()
     sessions.sort(
         key=lambda s: s.ended_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True
     )
