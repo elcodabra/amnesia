@@ -1,0 +1,10 @@
+# Gemini access. google-genai is the SDK the hackathon requires; ADK builds on
+# it and is added on top for the agent framework requirement.
+google-genai>=1.0.0
+google-adk>=1.0.0
+# Persistent cross-session memory in the cloud.
+google-cloud-firestore>=2.16.0
+# HTTP surface. FastAPI because Cloud Run wants one small ASGI process.
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pydantic>=2.0.0
