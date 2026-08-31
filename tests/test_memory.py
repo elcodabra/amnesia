@@ -237,3 +237,42 @@ def test_transcript_keeps_the_end_of_the_session() -> None:
     text = session.transcript(limit=3)
     assert "turn 39" in text
     assert "turn 0" not in text
+
+
+def test_project_name_recovered_from_flattened_dir() -> None:
+    """Claude Code sessions that ended without a cwd still belong to a project."""
+    from amnesia.ingest.sessions import _project_from_dir
+
+    assert _project_from_dir("-Users-me-src-backoffice") == "backoffice"
+    assert _project_from_dir("") == "unknown"
+    assert _project_from_dir("-") == "unknown"
+
+
+def test_root_and_home_are_not_projects() -> None:
+    """Clients write "/" when they do not know; that is not a project name."""
+    from pathlib import Path
+
+    from amnesia.ingest.sessions import _project_of
+
+    assert _project_of("/") == "unknown"
+    assert _project_of(str(Path.home())) == "unknown"
+    assert _project_of("/Users/me/src/thing") == "thing"
+
+
+def test_container_directories_are_not_projects() -> None:
+    """"src" is where projects live, not a project someone works on."""
+    from amnesia.ingest.sessions import _project_of
+
+    assert _project_of("/Users/me/src") == "unknown"
+    assert _project_of("/Users/me/code") == "unknown"
+
+
+def test_unknown_is_not_counted_as_a_project() -> None:
+    """Absence of a project must not become the top project on the card."""
+    sessions = [
+        _session("a", project="unknown"),
+        _session("b", start_min=120, project="unknown"),
+        _session("c", start_min=240, project="real-thing"),
+    ]
+    projects = analyse(sessions).projects
+    assert [name for name, _ in projects] == ["real-thing"]

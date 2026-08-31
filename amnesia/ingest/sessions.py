@@ -23,6 +23,10 @@ from typing import Iterable, Iterator
 MAX_TURN_CHARS = 2_000
 MAX_TURNS_PER_SESSION = 60
 
+# Directories people keep repositories in. Reporting "src" as a project tells
+# someone nothing about their own work.
+CONTAINER_DIRS = {"src", "code", "projects", "repos", "dev", "work", "workspace", "users"}
+
 
 @dataclass
 class Turn:
@@ -100,9 +104,35 @@ def _flatten_content(content: object) -> str:
 
 
 def _project_of(path: str | None) -> str:
+    """Project name from a working directory.
+
+    Some directories are not projects and must not be reported as one: the
+    filesystem root, which is what a client writes when it does not know; the
+    home directory, which would show up as a project named after the user; and
+    the container directories people keep repositories in.
+    """
     if not path:
         return "unknown"
-    return Path(path).name or "unknown"
+    resolved = Path(path)
+    if resolved in (Path("/"), Path.home()):
+        return "unknown"
+    name = resolved.name
+    if not name or name.lower() in CONTAINER_DIRS:
+        return "unknown"
+    return name
+
+
+def _project_from_dir(dirname: str) -> str:
+    """Recover a project name from Claude Code's flattened directory name.
+
+    Claude Code stores `/Users/me/src/thing` as `-Users-me-src-thing`. The
+    original separators are unrecoverable, but rebuilding a path is enough to
+    reuse the same rules, so the home directory does not become a project here
+    either.
+    """
+    if not dirname.strip("-"):
+        return "unknown"
+    return _project_of("/" + dirname.strip("-").replace("-", "/"))
 
 
 # --------------------------------------------------------------------------
@@ -194,10 +224,17 @@ def read_claude_sessions(root: Path | None = None) -> Iterator[Session]:
 
         if not turns:
             continue
+        # `cwd` is the truth when it names a real project, but clients write
+        # "/" or the home directory when they do not know. Claude Code also
+        # encodes the project path in the directory name, which survives when
+        # cwd does not.
+        project = _project_of(cwd)
+        if project == "unknown":
+            project = _project_from_dir(path.parent.name)
         yield Session(
             id=path.stem,
             client="claude-code",
-            project=_project_of(cwd),
+            project=project,
             started_at=min(stamps) if stamps else None,
             ended_at=max(stamps) if stamps else None,
             turns=turns,

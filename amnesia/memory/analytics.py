@@ -125,10 +125,15 @@ def analyse(sessions: list[Session]) -> WorkingStyle:
     stamps = [s.started_at for s in real]
     span_days = (max(stamps) - min(stamps)).days + 1 if stamps else 0
 
+    # "unknown" is the absence of a project, not a project. Counted, it would
+    # top the list on any machine where one client omits the working directory,
+    # and the headline number of projects would be wrong.
+    projects = Counter(s.project for s in sessions if s.project != "unknown")
+
     return WorkingStyle(
         total_sessions=len(sessions),
         active_hours=round(active_minutes(sessions) / 60, 1),
-        projects=Counter(s.project for s in sessions).most_common(6),
+        projects=projects.most_common(6),
         clients=Counter(s.client for s in sessions).most_common(),
         peak_hour=peak_hour,
         peak_hour_share=round(peak_count / len(real), 2) if real else 0.0,
