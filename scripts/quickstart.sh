@@ -45,4 +45,6 @@ echo
 echo "==> Starting on http://localhost:8080"
 echo "    Click 'Run background pass' to watch it learn from your own sessions."
 echo
-exec .venv/bin/python -m uvicorn amnesia.web.app:app --host 0.0.0.0 --port "${PORT:-8080}"
+# This machine only: the routes have no auth, and the memory comes from your real sessions.
+# HOST=0.0.0.0 opens it to the network, for a machine and network you trust.
+exec .venv/bin/python -m uvicorn amnesia.web.app:app --host "${HOST:-127.0.0.1}" --port "${PORT:-8080}"
